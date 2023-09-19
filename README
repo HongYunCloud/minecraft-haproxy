@@ -1,3 +1,25 @@
+this is not official version of HAProxy, NEVER submit issue to HAProxy issues
+and email list.
+
+这不是 HAProxy 的官方版本，绝对不要提交问题到 HAProxy issues 及邮件列表。
+
+HAProxy HongYunCloud branch, provide acl rules for Minecraft. You can use
+Minecraft acl in layer 4 forwarding.
+
+HAProxy 红云分支，为 acl 提供 minecraft 相关规则。你可以在四层转发中使用 minecraft acl。
+
+listen some_listener
+    bind :25565
+
+    acl sni_is_dev1 req.mc_sni -i dev1.example.com
+
+    tcp-request inspect-delay 5s
+    use-server s1 if sni_is_dev1
+
+    server s1 192.168.1.2:25565
+
+=============================================================================
+
 The HAProxy documentation has been split into a number of different files for
 ease of use.
 

@@ -494,7 +494,7 @@ static void display_version()
 {
 	struct utsname utsname;
 
-	printf("HAProxy version %s %s - https://haproxy.org/\n"
+	printf("HongYunCloud-HAProxy version %s %s - https://github.com/HongYunCloud/minecraft-haproxy/\n"
 	       PRODUCT_STATUS "\n", haproxy_version, haproxy_date);
 
 	if (strlen(PRODUCT_URL_BUGS) > 0) {

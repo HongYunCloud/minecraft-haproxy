@@ -37,16 +37,16 @@ smp_fetch_mc_ext(const struct arg *args, struct sample *smp, const char *kw, voi
   struct minecraft_handshake packet;
   int result = parse_minecraft_handshake(smp, &packet);
 
-  switch (result) {
-    case 0: {
-      smp->data.type = SMP_T_BOOL;
-      smp->data.u.sint = 1;
-      smp->flags = SMP_F_VOLATILE;
-      return 1;
-    }
-    case 1: smp->flags = SMP_F_MAY_CHANGE;
-    default: return 0;
+  if(result == 0) {
+    smp->data.type = SMP_T_BOOL;
+    smp->data.u.sint = 1;
+    smp->flags = SMP_F_VOLATILE;
+    return 1;
   }
+  if(result == 1) {
+    smp->flags = SMP_F_MAY_CHANGE;
+  }
+  return 0;
 }
 
 static int
@@ -54,16 +54,16 @@ smp_fetch_mc_ver(const struct arg *args, struct sample *smp, const char *kw, voi
   struct minecraft_handshake packet;
   int result = parse_minecraft_handshake(smp, &packet);
 
-  switch (result) {
-    case 0: {
-      smp->data.type = SMP_T_SINT;
-      smp->data.u.sint = packet.protocol_version;
-      smp->flags = SMP_F_VOLATILE;
-      return 1;
-    }
-    case 1: smp->flags = SMP_F_MAY_CHANGE;
-    default: return 0;
+  if(result == 0) {
+    smp->data.type = SMP_T_SINT;
+    smp->data.u.sint = packet.protocol_version;
+    smp->flags = SMP_F_VOLATILE;
+    return 1;
   }
+  if(result == 1) {
+    smp->flags = SMP_F_MAY_CHANGE;
+  }
+  return 0;
 }
 
 static int
@@ -71,17 +71,17 @@ smp_fetch_mc_sni(const struct arg *args, struct sample *smp, const char *kw, voi
   struct minecraft_handshake packet;
   int result = parse_minecraft_handshake(smp, &packet);
 
-  switch (result) {
-    case 0: {
+  if(result == 0) {
       smp->data.type = SMP_T_STR;
       smp->data.u.str.area = packet.server_address;
       smp->data.u.str.data = packet.server_address_size;
       smp->flags = SMP_F_VOLATILE | SMP_F_CONST;
-      return 1;
-    }
-    case 1: smp->flags = SMP_F_MAY_CHANGE;
-    default: return 0;
+    return 1;
   }
+  if(result == 1) {
+    smp->flags = SMP_F_MAY_CHANGE;
+  }
+  return 0;
 }
 
 static int
@@ -89,16 +89,16 @@ smp_fetch_mc_port(const struct arg *args, struct sample *smp, const char *kw, vo
   struct minecraft_handshake packet;
   int result = parse_minecraft_handshake(smp, &packet);
 
-  switch (result) {
-    case 0: {
-      smp->data.type = SMP_T_SINT;
-      smp->data.u.sint = packet.server_port;
-      smp->flags = SMP_F_VOLATILE;
-      return 1;
-    }
-    case 1: smp->flags = SMP_F_MAY_CHANGE;
-    default: return 0;
+  if(result == 0) {
+    smp->data.type = SMP_T_SINT;
+    smp->data.u.sint = (long long int) packet.server_port;
+    smp->flags = SMP_F_VOLATILE;
+    return 1;
   }
+  if(result == 1) {
+    smp->flags = SMP_F_MAY_CHANGE;
+  }
+  return 0;
 }
 
 static int
@@ -106,16 +106,16 @@ smp_fetch_mc_state(const struct arg *args, struct sample *smp, const char *kw, v
   struct minecraft_handshake packet;
   int result = parse_minecraft_handshake(smp, &packet);
 
-  switch (result) {
-    case 0: {
-      smp->data.type = SMP_T_SINT;
-      smp->data.u.sint = (long long int) packet.next_state;
-      smp->flags = SMP_F_VOLATILE;
-      return 1;
-    }
-    case 1: smp->flags = SMP_F_MAY_CHANGE;
-    default: return 0;
+  if(result == 0) {
+    smp->data.type = SMP_T_SINT;
+    smp->data.u.sint = (long long int) packet.next_state;
+    smp->flags = SMP_F_VOLATILE;
+    return 1;
   }
+  if(result == 1) {
+    smp->flags = SMP_F_MAY_CHANGE;
+  }
+  return 0;
 }
 
 /* wait for more data as long as possible, then return TRUE. This should be

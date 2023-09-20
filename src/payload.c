@@ -25,6 +25,7 @@
 #include <haproxy/sample.h>
 #include <haproxy/stconn.h>
 #include <haproxy/tools.h>
+#include "haproxy/minecraft.h"
 
 
 /************************************************************************/
@@ -33,333 +34,88 @@
 
 static int
 smp_fetch_mc_ext(const struct arg *args, struct sample *smp, const char *kw, void *private) {
-  struct channel *chn;
-  char *data, *data_end, *server_address, *server_address_end;
-  uint64_t packet_size, packet_id, protocol_version, server_address_size, server_port, next_state;
-  printf("inbound\n");
-  if (!smp->strm)
-    goto not_minecraft_handshake;
+  struct minecraft_handshake packet;
+  int result = parse_minecraft_handshake(smp, &packet);
 
-  /* meaningless for HTX buffers */
-  if (IS_HTX_STRM(smp->strm))
-    goto not_minecraft_handshake;
-
-  chn = ((smp->opt & SMP_OPT_DIR) == SMP_OPT_DIR_RES) ? &smp->strm->res : &smp->strm->req;
-
-  data = (char *)ci_head(chn);
-  data_end = data + ci_data(chn);
-
-  if (data_end - data <= 0)
-    goto too_short;
-
-  if(decode_varint(&data, data_end, &packet_size) < 0)
-    goto too_short;
-
-  if(packet_size > 1024)
-    goto not_minecraft_handshake;
-
-  if (data + packet_size > data_end)
-    goto too_short;
-  data_end = data + packet_size;
-
-  if(decode_varint(&data, data_end, &packet_id) < 0)
-    goto not_minecraft_handshake;
-
-  if(decode_varint(&data, data_end, &protocol_version) < 0)
-    goto not_minecraft_handshake;
-
-  if(decode_varint(&data, data_end, &server_address_size) < 0)
-    goto not_minecraft_handshake;
-
-  if(server_address_size > data_end - data)
-    goto not_minecraft_handshake;
-  server_address = data;
-  server_address_end = server_address + server_address_size;
-  data += server_address_size;
-
-  if(data_end - data < 2)
-    goto not_minecraft_handshake;
-  server_port = (data[0] << 8) | data[1];
-  data += 2;
-
-  if(decode_varint(&data, data_end, &next_state) < 0 || packet_id != 0)
-    goto not_minecraft_handshake;
-
-  smp->data.type = SMP_T_BOOL;
-  smp->data.u.sint = 1;
-  smp->flags = SMP_F_VOLATILE;
-  return 1;
-
- too_short:
-  smp->flags = SMP_F_MAY_CHANGE;
-
- not_minecraft_handshake:
-  return 0;
+  switch (result) {
+    case 0: {
+      smp->data.type = SMP_T_BOOL;
+      smp->data.u.sint = 1;
+      smp->flags = SMP_F_VOLATILE;
+      return 1;
+    }
+    case 1: smp->flags = SMP_F_MAY_CHANGE;
+    default: return 0;
+  }
 }
 
 static int
 smp_fetch_mc_ver(const struct arg *args, struct sample *smp, const char *kw, void *private) {
-  struct channel *chn;
-  char *data, *data_end, *server_address, *server_address_end;
-  uint64_t packet_size, packet_id, protocol_version, server_address_size, server_port, next_state;
-  printf("inbound\n");
-  if (!smp->strm)
-    goto not_minecraft_handshake;
+  struct minecraft_handshake packet;
+  int result = parse_minecraft_handshake(smp, &packet);
 
-  /* meaningless for HTX buffers */
-  if (IS_HTX_STRM(smp->strm))
-    goto not_minecraft_handshake;
-
-  chn = ((smp->opt & SMP_OPT_DIR) == SMP_OPT_DIR_RES) ? &smp->strm->res : &smp->strm->req;
-
-  data = (char *)ci_head(chn);
-  data_end = data + ci_data(chn);
-
-  if (data_end - data <= 0)
-    goto too_short;
-
-  if(decode_varint(&data, data_end, &packet_size) < 0)
-    goto too_short;
-
-  if(packet_size > 1024)
-    goto not_minecraft_handshake;
-
-  if (data + packet_size > data_end)
-    goto too_short;
-  data_end = data + packet_size;
-
-  if(decode_varint(&data, data_end, &packet_id) < 0)
-    goto not_minecraft_handshake;
-
-  if(decode_varint(&data, data_end, &protocol_version) < 0)
-    goto not_minecraft_handshake;
-
-  if(decode_varint(&data, data_end, &server_address_size) < 0)
-    goto not_minecraft_handshake;
-
-  if(server_address_size > data_end - data)
-    goto not_minecraft_handshake;
-  server_address = data;
-  server_address_end = server_address + server_address_size;
-  data += server_address_size;
-
-  if(data_end - data < 2)
-    goto not_minecraft_handshake;
-  server_port = (data[0] << 8) | data[1];
-  data += 2;
-
-  if(decode_varint(&data, data_end, &next_state) < 0 || packet_id != 0)
-    goto not_minecraft_handshake;
-
-  smp->data.type = SMP_T_SINT;
-  smp->data.u.sint = protocol_version;
-  smp->flags = SMP_F_VOLATILE;
-  return 1;
-
-  too_short:
-  smp->flags = SMP_F_MAY_CHANGE;
-
-  not_minecraft_handshake:
-  return 0;
+  switch (result) {
+    case 0: {
+      smp->data.type = SMP_T_SINT;
+      smp->data.u.sint = packet.protocol_version;
+      smp->flags = SMP_F_VOLATILE;
+      return 1;
+    }
+    case 1: smp->flags = SMP_F_MAY_CHANGE;
+    default: return 0;
+  }
 }
 
 static int
 smp_fetch_mc_sni(const struct arg *args, struct sample *smp, const char *kw, void *private) {
-  struct channel *chn;
-  char *data, *data_end, *server_address, *server_address_end;
-  uint64_t packet_size, packet_id, protocol_version, server_address_size, server_port, next_state;
-  printf("inbound\n");
-  if (!smp->strm)
-    goto not_minecraft_handshake;
+  struct minecraft_handshake packet;
+  int result = parse_minecraft_handshake(smp, &packet);
 
-  /* meaningless for HTX buffers */
-  if (IS_HTX_STRM(smp->strm))
-    goto not_minecraft_handshake;
-
-  chn = ((smp->opt & SMP_OPT_DIR) == SMP_OPT_DIR_RES) ? &smp->strm->res : &smp->strm->req;
-
-  data = (char *)ci_head(chn);
-  data_end = data + ci_data(chn);
-
-  if (data_end - data <= 0)
-    goto too_short;
-
-  if(decode_varint(&data, data_end, &packet_size) < 0)
-    goto too_short;
-
-  if(packet_size > 1024)
-    goto not_minecraft_handshake;
-
-  if (data + packet_size > data_end)
-    goto too_short;
-  data_end = data + packet_size;
-
-  if(decode_varint(&data, data_end, &packet_id) < 0)
-    goto not_minecraft_handshake;
-
-  if(decode_varint(&data, data_end, &protocol_version) < 0)
-    goto not_minecraft_handshake;
-
-  if(decode_varint(&data, data_end, &server_address_size) < 0)
-    goto not_minecraft_handshake;
-
-  if(server_address_size > data_end - data)
-    goto not_minecraft_handshake;
-  server_address = data;
-  server_address_end = server_address + server_address_size;
-  data += server_address_size;
-
-  if(data_end - data < 2)
-    goto not_minecraft_handshake;
-  server_port = (data[0] << 8) | data[1];
-  data += 2;
-
-  if(decode_varint(&data, data_end, &next_state) < 0 || packet_id != 0)
-    goto not_minecraft_handshake;
-
-  smp->data.type = SMP_T_STR;
-  smp->data.u.str.area = server_address;
-  smp->data.u.str.data = server_address_size;
-  smp->flags = SMP_F_VOLATILE | SMP_F_CONST;
-  return 1;
-
-  too_short:
-  smp->flags = SMP_F_MAY_CHANGE;
-
-  not_minecraft_handshake:
-  return 0;
+  switch (result) {
+    case 0: {
+      smp->data.type = SMP_T_STR;
+      smp->data.u.str.area = packet.server_address;
+      smp->data.u.str.data = packet.server_address_size;
+      smp->flags = SMP_F_VOLATILE | SMP_F_CONST;
+      return 1;
+    }
+    case 1: smp->flags = SMP_F_MAY_CHANGE;
+    default: return 0;
+  }
 }
 
 static int
 smp_fetch_mc_port(const struct arg *args, struct sample *smp, const char *kw, void *private) {
-  struct channel *chn;
-  char *data, *data_end, *server_address, *server_address_end;
-  uint64_t packet_size, packet_id, protocol_version, server_address_size, server_port, next_state;
-  printf("inbound\n");
-  if (!smp->strm)
-    goto not_minecraft_handshake;
+  struct minecraft_handshake packet;
+  int result = parse_minecraft_handshake(smp, &packet);
 
-  /* meaningless for HTX buffers */
-  if (IS_HTX_STRM(smp->strm))
-    goto not_minecraft_handshake;
-
-  chn = ((smp->opt & SMP_OPT_DIR) == SMP_OPT_DIR_RES) ? &smp->strm->res : &smp->strm->req;
-
-  data = (char *)ci_head(chn);
-  data_end = data + ci_data(chn);
-
-  if (data_end - data <= 0)
-    goto too_short;
-
-  if(decode_varint(&data, data_end, &packet_size) < 0)
-    goto too_short;
-
-  if(packet_size > 1024)
-    goto not_minecraft_handshake;
-
-  if (data + packet_size > data_end)
-    goto too_short;
-  data_end = data + packet_size;
-
-  if(decode_varint(&data, data_end, &packet_id) < 0)
-    goto not_minecraft_handshake;
-
-  if(decode_varint(&data, data_end, &protocol_version) < 0)
-    goto not_minecraft_handshake;
-
-  if(decode_varint(&data, data_end, &server_address_size) < 0)
-    goto not_minecraft_handshake;
-
-  if(server_address_size > data_end - data)
-    goto not_minecraft_handshake;
-  server_address = data;
-  server_address_end = server_address + server_address_size;
-  data += server_address_size;
-
-  if(data_end - data < 2)
-    goto not_minecraft_handshake;
-  server_port = (data[0] << 8) | data[1];
-  data += 2;
-
-  if(decode_varint(&data, data_end, &next_state) < 0 || packet_id != 0)
-    goto not_minecraft_handshake;
-
-  smp->data.type = SMP_T_SINT;
-  smp->data.u.sint = server_port;
-  smp->flags = SMP_F_VOLATILE;
-  return 1;
-
-  too_short:
-  smp->flags = SMP_F_MAY_CHANGE;
-
-  not_minecraft_handshake:
-  return 0;
+  switch (result) {
+    case 0: {
+      smp->data.type = SMP_T_SINT;
+      smp->data.u.sint = packet.server_port;
+      smp->flags = SMP_F_VOLATILE;
+      return 1;
+    }
+    case 1: smp->flags = SMP_F_MAY_CHANGE;
+    default: return 0;
+  }
 }
 
 static int
 smp_fetch_mc_state(const struct arg *args, struct sample *smp, const char *kw, void *private) {
-  struct channel *chn;
-  char *data, *data_end, *server_address, *server_address_end;
-  uint64_t packet_size, packet_id, protocol_version, server_address_size, server_port, next_state;
-  printf("inbound\n");
-  if (!smp->strm)
-    goto not_minecraft_handshake;
+  struct minecraft_handshake packet;
+  int result = parse_minecraft_handshake(smp, &packet);
 
-  /* meaningless for HTX buffers */
-  if (IS_HTX_STRM(smp->strm))
-    goto not_minecraft_handshake;
-
-  chn = ((smp->opt & SMP_OPT_DIR) == SMP_OPT_DIR_RES) ? &smp->strm->res : &smp->strm->req;
-
-  data = (char *)ci_head(chn);
-  data_end = data + ci_data(chn);
-
-  if (data_end - data <= 0)
-    goto too_short;
-
-  if(decode_varint(&data, data_end, &packet_size) < 0)
-    goto too_short;
-
-  if(packet_size > 1024)
-    goto not_minecraft_handshake;
-
-  if (data + packet_size > data_end)
-    goto too_short;
-  data_end = data + packet_size;
-
-  if(decode_varint(&data, data_end, &packet_id) < 0)
-    goto not_minecraft_handshake;
-
-  if(decode_varint(&data, data_end, &protocol_version) < 0)
-    goto not_minecraft_handshake;
-
-  if(decode_varint(&data, data_end, &server_address_size) < 0)
-    goto not_minecraft_handshake;
-
-  if(server_address_size > data_end - data)
-    goto not_minecraft_handshake;
-  server_address = data;
-  server_address_end = server_address + server_address_size;
-  data += server_address_size;
-
-  if(data_end - data < 2)
-    goto not_minecraft_handshake;
-  server_port = (data[0] << 8) | data[1];
-  data += 2;
-
-  if(decode_varint(&data, data_end, &next_state) < 0 || packet_id != 0)
-    goto not_minecraft_handshake;
-
-  smp->data.type = SMP_T_SINT;
-  smp->data.u.sint = next_state;
-  smp->flags = SMP_F_VOLATILE;
-  return 1;
-
-  too_short:
-  smp->flags = SMP_F_MAY_CHANGE;
-
-  not_minecraft_handshake:
-  return 0;
+  switch (result) {
+    case 0: {
+      smp->data.type = SMP_T_SINT;
+      smp->data.u.sint = (long long int) packet.next_state;
+      smp->flags = SMP_F_VOLATILE;
+      return 1;
+    }
+    case 1: smp->flags = SMP_F_MAY_CHANGE;
+    default: return 0;
+  }
 }
 
 /* wait for more data as long as possible, then return TRUE. This should be
